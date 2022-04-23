@@ -1,0 +1,39 @@
+(ns tea.api
+  (:require
+    [cljd.walk :refer [keywordize-keys]]
+    [clojure.string :refer [join]]
+    ["package:graphql/client.dart" :as g]
+    ["package:flutter/material.dart" :as m]))
+
+(defn- print [& args]
+  (dart:core/print (join " " args)))
+
+(def ^{:private true :const true} 
+  base-url "https://countries.trevorblades.com/")
+
+(def ^:private http-link (g/HttpLink. base-url))
+
+(def ^{:private true :conts true}
+  query-get-countries (str "query {
+                              countries{
+                                  code
+                                  name
+                              }
+                           }"))
+
+(def ^:private client 
+  (g/GraphQLClient. :link http-link 
+                    :cache (g/GraphQLCache. :store (g/InMemoryStore.))))
+
+(defn get-countries []
+  (let [^:m/QueryResult result (await 
+                                 (.query client 
+                                         (g/QueryOptions 
+                                           :document (g/gql query-get-countries))))
+        map-result (.-data result)]
+    (print (.-runtimeType map-result))
+    (print "result not keywordize " (keys (keywordize-keys map-result)))
+    (print "but the function works " (keywordize-keys {"a" 1}))
+    (if (.-hasException result)
+      (throw (.exception! result))
+      (keywordize-keys (.-data result)))))
