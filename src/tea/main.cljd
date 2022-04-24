@@ -1,37 +1,49 @@
 (ns tea.main
   (:require
    ["package:flutter/material.dart" :as m]
+   [clojure.string :refer [join]]
    [tea.api :as api]
    [cljd.flutter.alpha :as f]))
 
+(defn- print [& args]
+  (dart:core/print (join " " (list* "main: " args))))
+
+(defn-  build-drop-down-item [countries]
+  (print "got countries like: " countries)
+   (map 
+    (fn [{:keys [name code]}]
+      (m/DropdownMenuItem
+        :child (m/Text. name)
+        :value name))
+    countries))
+
+
 (defn ^m/Widget first-page [_]
   (f/widget
-    :state [state {:count 0}]
+    :state [state {:count 0 :selected nil}]
     (m/Scaffold.
       :backgroundColor m.Colors/black
       :body 
       (m/Padding.
         :padding (.all m/EdgeInsets 16)
         :child 
-        (m/Column
-          :crossAxisAlignment m.CrossAxisAlignment/center
-          :mainAxisAlignment m.MainAxisAlignment/center
-          :children [(m/SizedBox. :height 32)
-                     (m/Text. 
-                       (str "Count: " (:count @state))
-                       :style (m/TextStyle.
-                                :color m.Colors/white
-                                :fontSize 32.0))
-                     (m/SizedBox. :height 32)
-                     (m/Center
-                       :child 
-                       (m/TextButton
-                         :onPressed 
-                         (fn [] 
-                           (await (api/get-countries))
-                           (swap! state update :count inc))
-                         :child (m/Text "TextButton")))
-                     (m/SizedBox. :height 100)])))))
+        (m/FutureBuilder.
+             :future (api/get-countries)
+             :builder 
+             (fn [_ snapshot]
+               (if (= m.ConnectionState/done (.-connectionState snapshot))
+                 (m/Container
+                   :padding ^:const (m.EdgeInsets/symmetric :horizontal 10)
+                   :child (m/DropdownButtonFormField.
+                            :decoration 
+                            ^:const (m/InputDecoration.
+                                      :labelText "Choose Country"
+                                      :border (m/OutlineInputBorder.))
+                            :items 
+                            ^#/(List m/DropdownMenuItem) (build-drop-down-item (.-data snapshot))
+                            :value (:selected @state)
+                            :onChanged #(swap! state assoc :selected %)))
+                 (m/CircularProgressIndicator.))))))))
 
 (defn main []
   (m/runApp

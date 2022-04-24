@@ -25,15 +25,35 @@
   (g/GraphQLClient. :link http-link 
                     :cache (g/GraphQLCache. :store (g/InMemoryStore.))))
 
+(defn- keywordize-blunt [entry]
+  (cond 
+    (dart/is? entry Map) 
+    (loop [result {}
+           entries (seq entry) ]
+      (let [[k v] (first entries)]
+        (if k
+          (recur 
+            (assoc result 
+                   (keyword k)
+                   (keywordize-blunt v))
+            (rest entries))
+          result)))
+
+    (dart/is? entry List)
+    (map (fn [e] (keywordize-blunt e)) entry)
+
+    :else entry))
+
 (defn get-countries []
   (let [^:m/QueryResult result (await 
                                  (.query client 
                                          (g/QueryOptions 
                                            :document (g/gql query-get-countries))))
         map-result (.-data result)]
-    (print (.-runtimeType map-result))
-    (print "result not keywordize " (keys (keywordize-keys map-result)))
-    (print "but the function works " (keywordize-keys {"a" 1}))
+    ; (print "runtimeType " (.-runtimeType (get map-result "countries")))
+    ; (print "instance " (sequential? (get map-result "countries")))
+    ; (print "result not keywordize " (keywordize-blunt (into {} map-result)))
+    ; (print "but the function works " (keywordize-keys {"a" 1}))
     (if (.-hasException result)
       (throw (.exception! result))
-      (keywordize-keys (.-data result)))))
+      (keywordize-keys (-> map-result keywordize-blunt :countries)))))
