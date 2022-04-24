@@ -8,21 +8,19 @@
 (defn- print [& args]
   (dart:core/print (join " " (list* "main: " args))))
 
-(defn-  build-drop-down-item [countries]
-  (print "got countries like: " countries)
+(defn- build-drop-down-item [countries]
    (map 
     (fn [{:keys [name code]}]
-      (m/DropdownMenuItem
+     (m/DropdownMenuItem
         :child (m/Text. name)
         :value name))
     countries))
-
 
 (defn ^m/Widget first-page [_]
   (f/widget
     :state [state {:count 0 :selected nil}]
     (m/Scaffold.
-      :backgroundColor m.Colors/black
+      :backgroundColor m.Colors/grey
       :body 
       (m/Padding.
         :padding (.all m/EdgeInsets 16)
@@ -39,8 +37,7 @@
                             ^:const (m/InputDecoration.
                                       :labelText "Choose Country"
                                       :border (m/OutlineInputBorder.))
-                            :items 
-                            ^#/(List m/DropdownMenuItem) (build-drop-down-item (.-data snapshot))
+                            :items ^List (build-drop-down-item (.-data snapshot))
                             :value (:selected @state)
                             :onChanged #(swap! state assoc :selected %)))
                  (m/CircularProgressIndicator.))))))))
