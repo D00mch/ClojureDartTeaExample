@@ -18,11 +18,12 @@
 # Lint
 .clj-kondo/*
 !.clj-kondo/config.edn
+!.clj-kondo/hooks/
 .lsp/
 
 # Cljdart generated
 .clojuredart/
-lib/cljd-out/
+lib/cljd-out/*
 .cpcache/
 
 # The .vscode folder contains launch configuration and tasks you configure in
