@@ -5,12 +5,12 @@
    [tea.api :as api]
    [cljd.flutter.alpha :as f]))
 
-(defn- print [& args]
+(defn- log [& args]
   (dart:core/print (join " " (list* "main: " args))))
 
 (defn- build-drop-down-item [countries]
    (map 
-    (fn [{:keys [name code]}]
+    (fn [{:keys [^String name _]}]
      (m/DropdownMenuItem
         :child (m/Text. name)
         :value name))

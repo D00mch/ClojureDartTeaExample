@@ -5,7 +5,7 @@
     ["package:graphql/client.dart" :as g]
     ["package:flutter/material.dart" :as m]))
 
-(defn- print [& args]
+(defn- log [& args]
   (dart:core/print (join " " args)))
 
 (def ^{:private true :const true} 
@@ -54,6 +54,7 @@
     ; (print "instance " (sequential? (get map-result "countries")))
     ; (print "result not keywordize " (keywordize-blunt (into {} map-result)))
     ; (print "but the function works " (keywordize-keys {"a" 1}))
+    (log "andorra: " )
     (if (.-hasException result)
       (throw (.exception! result))
       (keywordize-keys (-> map-result keywordize-blunt :countries)))))
