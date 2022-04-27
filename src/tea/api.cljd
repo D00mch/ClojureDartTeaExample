@@ -2,8 +2,7 @@
   (:require
     [cljd.walk :refer [keywordize-keys]]
     [clojure.string :refer [join]]
-    ["package:graphql/client.dart" :as g]
-    ["package:flutter/material.dart" :as m]))
+    ["package:graphql/client.dart" :as g]))
 
 (defn- log [& args]
   (dart:core/print (join " " args)))
@@ -14,12 +13,25 @@
 (def ^:private http-link (g/HttpLink. base-url))
 
 (def ^{:private true :conts true}
-  query-get-countries (str "query {
-                              countries{
-                                  code
-                                  name
-                              }
-                           }"))
+  query-get-countries "query {
+                         countries{
+                             code
+                             name
+                         }
+                      }")
+
+(def ^{:private true :const true}
+  query-get-country "query getCountry($code:ID!){
+                      country(code:$code){
+                        name
+                        capital
+                        code
+                        native
+                        currency
+                        phone
+                        emoji
+                      }
+                    }")
 
 (def ^:private client 
   (g/GraphQLClient. :link http-link 
@@ -44,17 +56,19 @@
 
     :else entry))
 
-(defn get-countries []
-  (let [^:m/QueryResult result (await 
-                                 (.query client 
-                                         (g/QueryOptions 
-                                           :document (g/gql query-get-countries))))
-        map-result (.-data result)]
-    ; (print "runtimeType " (.-runtimeType (get map-result "countries")))
-    ; (print "instance " (sequential? (get map-result "countries")))
-    ; (print "result not keywordize " (keywordize-blunt (into {} map-result)))
-    ; (print "but the function works " (keywordize-keys {"a" 1}))
-    (log "andorra: " )
+(defn ^:async get-countries []
+  (let [opts  (g/QueryOptions :document (g/gql query-get-countries))
+        result (-> client (.query opts) await)]
     (if (.-hasException result)
       (throw (.exception! result))
-      (keywordize-keys (-> map-result keywordize-blunt :countries)))))
+      (keywordize-keys (-> result .-data keywordize-blunt :countries)))))
+
+(defn ^:async get-country [code]
+  (let [opts (g/QueryOptions. :document (g/gql query-get-country)
+                              :variables (. {"code" code} #/(cast String dynamic)))
+        ;; it's a future
+        result (.query client opts)
+        _ (log "query-result is " result)
+        result (await result)
+        _ (log "deref-result is " result)]
+    nil))

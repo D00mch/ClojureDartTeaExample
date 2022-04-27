@@ -8,13 +8,23 @@
 (defn- log [& args]
   (dart:core/print (join " " (list* "main: " args))))
 
-(defn- build-drop-down-item [countries]
-   (map 
-    (fn [{:keys [^String name _]}]
-     (m/DropdownMenuItem
-        :child (m/Text. name)
-        :value name))
-    countries))
+(defn- widget-pick-country [& {:keys [state snapshot]}]
+  (if (= m.ConnectionState/done (.-connectionState snapshot))
+    (m/DropdownButtonFormField.
+      :decoration ^:const  
+      (m/InputDecoration.
+        :labelText "Choose Country"
+        :border (m/OutlineInputBorder.))
+      :isExpanded true
+      :items ^List (map 
+                     (fn [{:keys [^String name _] :as country}]
+                       (m/DropdownMenuItem
+                         :child (m/Text. name)
+                         :value country))
+                     (.-data snapshot))
+      :value (:selected @state)
+      :onChanged #(swap! state assoc :selected %))
+    (m/Center :child (m/CircularProgressIndicator.))))
 
 (defn ^m/Widget first-page [_]
   (f/widget
@@ -22,27 +32,16 @@
     (m/Scaffold.
       :backgroundColor m.Colors/grey
       :body 
-      (m/Padding.
-        :padding (.all m/EdgeInsets 16)
-        :child 
+      (f/nest
+        (m/Padding. :padding (.all m/EdgeInsets 16))
         (m/FutureBuilder.
-             :future (api/get-countries)
-             :builder 
-             (fn [_ snapshot]
-               (if (= m.ConnectionState/done (.-connectionState snapshot))
-                 (m/Container
-                   :padding ^:const (m.EdgeInsets/symmetric :horizontal 10)
-                   :child (m/DropdownButtonFormField.
-                            :decoration 
-                            ^:const (m/InputDecoration.
-                                      :labelText "Choose Country"
-                                      :border (m/OutlineInputBorder.))
-                            :items ^List (build-drop-down-item (.-data snapshot))
-                            :value (:selected @state)
-                            :onChanged #(swap! state assoc :selected %)))
-                 (m/CircularProgressIndicator.))))))))
+          :future (api/get-countries)
+          :builder (fn [_ snapshot]
+                     (widget-pick-country :state state :snapshot snapshot)))))))
 
 (defn main []
+  (log "about to call api/get-country")
+  (api/get-country "AD")
   (m/runApp
     (m/MaterialApp.
       :title "Welcome to Flutter"
