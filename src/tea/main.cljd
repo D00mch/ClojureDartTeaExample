@@ -1,66 +1,106 @@
 (ns tea.main
   (:require
    ["package:flutter/material.dart" :as m]
-   [clojure.string :refer [join]]
+   [clojure.string :refer [join capitalize]]
    [tea.api :as api]
    [cljd.flutter.alpha :as f]))
 
-(defn- log [& args]
-  (dart:core/print (join " " (list* "main: " args))))
+(defn- log [& args] (dart:core/print (join " " (list* "main: " args))))
 
-(defrecord Country [code name])
+(defrecord Country [name capital code native currency phone emoji continent]
+  :extends Object
+  (== [this other] (= (:code this) (:code other))))
 
 (defn- widget-pick-country [& {:keys [state snapshot]}]
   (if (= m.ConnectionState/done (.-connectionState snapshot))
     (m/DropdownButtonFormField.
-      :decoration ^:const  
-      (m/InputDecoration.
-        :labelText "Choose Country"
-        :border (m/OutlineInputBorder.))
+      :decoration 
+      ^:const (m/InputDecoration.
+                :labelText "Choose Country"
+                :border (m/OutlineInputBorder.))
       :isExpanded true
       :items ^List (map 
-                     (fn [{:keys [^String name _] :as country}]
+                     (fn [{:keys [name code] :as country}]
                        (m/DropdownMenuItem
                          :child (m/Text. name)
-                         :value  country))
+                         :value (map->Country country)))
                      (.-data snapshot))
       :value (-> @state :selected)
       :onChanged #(swap! state assoc :selected %))
     (m/Center :child (m/CircularProgressIndicator.))))
 
-(defn widget-country-details [& {:keys [state]}]
-  (log :state :is @state)
-  (m/Text. "todo:"))
+(defn- widget-country-details [& {:keys [state snapshot]}]
+  (cond 
+    (= m.ConnectionState/waiting (.-connectionState snapshot))
+    (f/nest
+      (m/Padding. :padding (m.EdgeInsets/only :top 24))
+      (m/Center.)
+      (m/CircularProgressIndicator.))
+
+    (.-hasError snapshot)
+    (m/Center. :child (m/Text. "Unable to get the country"))
+
+    :else 
+    (m/Column.
+      :crossAxisAlignment m.CrossAxisAlignment/start
+      :children
+      [^:const (m/SizedBox. :height 12)
+       ^:const (m/Text. "Country Info"
+                        :style (m/TextStyle. :fontWeight m.FontWeight/bold))
+       ^:const (m/SizedBox. :height 6)
+       (f/nest
+         (m/Card. :color (.shade50 m.Colors/grey)
+                  :elevation 2.0)
+         (let [keys [:name :capital :code :native :currency :phone :emoji]
+               texts (map #(-> % str (subs 1) capitalize (str ":")) keys)
+               descr-style ^:const (m/TextStyle. :fontWeight m.FontWeight/bold :fontSize 16)
+               name-style ^:const (m/TextStyle. :fontSize 16)
+               country (.-data snapshot)]
+           (m/Padding. 
+              :padding (m.EdgeInsets/symmetric :horizontal 16 :vertical 16)
+              :child 
+              (m/Row.
+                :children
+                [(m/Column. 
+                   :crossAxisAlignment m.CrossAxisAlignment/start
+                   :children ^:const (map #(m/Text. % :style name-style) texts))
+                 ^:const (m/Spacer. :flex 3)
+                 (m/Column.
+                   :crossAxisAlignment m.CrossAxisAlignment/start
+                   :children ^:const (map #(m/Text. (% country) :style descr-style) keys))
+                 ^:const (m/Spacer. :flex 3)])
+              )))
+       ^:const (m/SizedBox. :height 12)
+       (m/Text. "Countinent Info"
+                :style (m/TextStyle. :fontWeight m.FontWeight/bold))
+       ^:const (m/SizedBox. :height 12)
+       (m/Text. (-> snapshot .-data :continent :name))])))
 
 (defn ^m/Widget first-page [_]
   (f/widget
-    :state [state {:count 0 :selected nil}]
-    (m/Scaffold.
-      :backgroundColor m.Colors/grey
+    :state [state {:count 0 
+                   :selected (map->Country {:name "France" :code "FR"})}]
+    (m/Scaffold. 
+      :appBar (m/AppBar. :title (m/Text. "Country TEA app"))
       :body 
-      (m/Column.
+      (m/Container
+        :padding ^:const (m.EdgeInsets/all 16),
+        :child (m/Column.
         :children 
         [^:const (m/SizedBox. :height 16)
-         (f/nest
-           (m/Padding. :padding (.all m/EdgeInsets 16))
-           (m/FutureBuilder.
-             :future (api/get-countries)
-             :builder (fn [_ snapshot]
-                        (widget-pick-country :state state :snapshot snapshot))))
-         (if (:selected @state) 
-           (widget-country-details :state state)
-           (m/SizedBox. :height 0))]))))
+         (m/FutureBuilder.
+           :future (api/get-countries)
+           :builder #(widget-pick-country :state state :snapshot %2))
+         (if-let [code (-> @state :selected :code)]
+           (m/FutureBuilder
+             :future (api/get-country code)
+             :builder #(widget-country-details :state state :snapshot %2))
+           (m/SizedBox. :height 0))])))))
 
 (defn main []
-  #_(log "about to call api/get-country")
-  #_(api/get-country "AD")
-
-  (log :defrecord-test (map->Country  {:code 1 :name "A"}))
-  (log :defrecord-test (Country. 1 "name"))
-
   (m/runApp
     (m/MaterialApp.
-      :title "Welcome to Flutter"
+      :title "Country App"
       :theme (m/ThemeData. :primarySwatch m.Colors/pink)
       :initialRoute "/" 
       :routes {"/" first-page})))
