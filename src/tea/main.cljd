@@ -8,6 +8,8 @@
 (defn- log [& args]
   (dart:core/print (join " " (list* "main: " args))))
 
+(defrecord Country [code name])
+
 (defn- widget-pick-country [& {:keys [state snapshot]}]
   (if (= m.ConnectionState/done (.-connectionState snapshot))
     (m/DropdownButtonFormField.
@@ -20,11 +22,15 @@
                      (fn [{:keys [^String name _] :as country}]
                        (m/DropdownMenuItem
                          :child (m/Text. name)
-                         :value country))
+                         :value  country))
                      (.-data snapshot))
-      :value (:selected @state)
+      :value (-> @state :selected)
       :onChanged #(swap! state assoc :selected %))
     (m/Center :child (m/CircularProgressIndicator.))))
+
+(defn widget-country-details [& {:keys [state]}]
+  (log :state :is @state)
+  (m/Text. "todo:"))
 
 (defn ^m/Widget first-page [_]
   (f/widget
@@ -32,16 +38,26 @@
     (m/Scaffold.
       :backgroundColor m.Colors/grey
       :body 
-      (f/nest
-        (m/Padding. :padding (.all m/EdgeInsets 16))
-        (m/FutureBuilder.
-          :future (api/get-countries)
-          :builder (fn [_ snapshot]
-                     (widget-pick-country :state state :snapshot snapshot)))))))
+      (m/Column.
+        :children 
+        [^:const (m/SizedBox. :height 16)
+         (f/nest
+           (m/Padding. :padding (.all m/EdgeInsets 16))
+           (m/FutureBuilder.
+             :future (api/get-countries)
+             :builder (fn [_ snapshot]
+                        (widget-pick-country :state state :snapshot snapshot))))
+         (if (:selected @state) 
+           (widget-country-details :state state)
+           (m/SizedBox. :height 0))]))))
 
 (defn main []
-  (log "about to call api/get-country")
-  (api/get-country "AD")
+  #_(log "about to call api/get-country")
+  #_(api/get-country "AD")
+
+  (log :defrecord-test (map->Country  {:code 1 :name "A"}))
+  (log :defrecord-test (Country. 1 "name"))
+
   (m/runApp
     (m/MaterialApp.
       :title "Welcome to Flutter"

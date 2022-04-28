@@ -67,8 +67,7 @@
   (let [opts (g/QueryOptions. :document (g/gql query-get-country)
                               :variables (. {"code" code} #/(cast String dynamic)))
         ;; it's a future
-        result (.query client opts)
-        _ (log "query-result is " result)
-        result (await result)
-        _ (log "deref-result is " result)]
-    nil))
+        result (-> client (.query opts) await)]
+    (if (.-hasException result)
+      (throw (.exception! result))
+      (keywordize-keys (-> result .-data keywordize-blunt :country)))))
