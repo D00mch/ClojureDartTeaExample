@@ -37,6 +37,16 @@
   }
 }")
 
+(def ^{:private true :const true} query-get-continents  
+"query getContinent($code:ID!){
+  continent(code:$code){
+    name
+    code
+    countries { name code }
+  }
+}")
+
+
 (def ^:private client 
   (g/GraphQLClient. :link http-link 
                     :cache (g/GraphQLCache. :store (g/InMemoryStore.))))
@@ -63,16 +73,22 @@
 (defn ^:async get-countries []
   (let [opts  (g/QueryOptions :document (g/gql query-get-countries))
         result (-> client (.query opts) await)]
-    (log :first-country (-> result .-data keywordize-blunt :countries first))
     (if (.-hasException result)
-      (throw (.exception! result))
+      {:error (.exception! result)}
       (keywordize-keys (-> result .-data keywordize-blunt :countries)))))
 
 (defn ^:async get-country [code]
   (let [opts (g/QueryOptions. :document (g/gql query-get-country)
                               :variables (. {"code" code} #/(cast String dynamic)))
-        ;; it's a future
         result (-> client (.query opts) await)]
     (if (.-hasException result)
-      (throw (.exception! result))
+      {:error (.exception! result)}
       (keywordize-keys (-> result .-data keywordize-blunt :country)))))
+
+(defn ^:async get-continent [code]
+  (let [opts (g/QueryOptions. :document (g/gql query-get-continents)
+                              :variables (. {"code" code} #/(cast String dynamic)))
+        result (-> client (.query opts) await)]
+    (if (.-hasException result)
+      {:error (.exception! result)}
+      (keywordize-keys (-> result .-data keywordize-blunt :continent)))))

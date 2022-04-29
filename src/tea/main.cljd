@@ -3,16 +3,52 @@
    ["package:flutter/material.dart" :as m]
    [clojure.string :refer [join capitalize]]
    [tea.api :as api]
-   [cljd.flutter.alpha :as f]))
+   [cljd.flutter.alpha :refer [nest widget]]))
 
 (defn- log [& args] (dart:core/print (join " " (list* "main: " args))))
 
-(defrecord Country [name capital code native currency phone emoji continent]
-  :extends Object
-  (== [this other] (= (:code this) (:code other))))
+(defn- ^:async effect-load-countries [dispatch!]
+  (dispatch! :loaded-countries (await (api/get-countries))))
 
-(defn- widget-pick-country [& {:keys [state snapshot]}]
-  (if (= m.ConnectionState/done (.-connectionState snapshot))
+(defn- ^:async effect-load-country [dispatch! code]
+  (dispatch! :loaded-country (await (api/get-country code))))
+
+(defn- ^:async effect-load-continent [dispatch! code]
+  (dispatch! :loaded-continent (await (api/get-continent code))))
+
+(defn- tea-update [state message data]
+  (case message
+    :user-openes-app [state [#(effect-load-countries %)]]
+
+    :user-choose-country [(assoc state :selected-country-code data :continent nil :expanded nil) 
+                          ;; some side effects demonstration : TODO rm in favor of readme
+                          [#(effect-load-country % data)
+                           #(log "country selected")]]
+
+    :user-click-expand-continent [(if (:expanded state)
+                                    (assoc state :expanded false)
+                                    (assoc state :expanded true))
+                                  (if (:continent state) [] [#(effect-load-continent % data)])]
+
+    ;; effects are optional: TODO: put in readme
+
+    :loaded-countries [(assoc state :countries data)]
+
+    :loaded-country [(assoc state :country data)]
+
+    :loaded-continent [(assoc state :continent data)]
+
+    [state [#(log "don't know how to process the message")]]))
+
+(defn- ^:async dispatch! [state-atom message data]
+  (let [[new-state effects] (tea-update @state-atom message data)
+        dispatch-for-effet-fn (partial dispatch! state-atom)]
+    (reset! state-atom new-state)
+    (doseq [e effects] (await (e dispatch-for-effet-fn)))
+    nil))
+
+(defn- widget-pick-country [state-atom]
+  (if-let [countries (-> @state-atom :countries)]
     (m/DropdownButtonFormField.
       :decoration 
       ^:const (m/InputDecoration.
@@ -20,82 +56,121 @@
                 :border (m/OutlineInputBorder.))
       :isExpanded true
       :items ^List (map 
-                     (fn [{:keys [name code] :as country}]
+                     (fn [country]
                        (m/DropdownMenuItem
-                         :child (m/Text. name)
-                         :value (map->Country country)))
-                     (.-data snapshot))
-      :value (-> @state :selected)
-      :onChanged #(swap! state assoc :selected %))
+                         :child (m/Text. (:name country))
+                         :value (:code country)))
+                     countries)
+      :value (-> @state-atom :selected-country-code)
+      :onChanged #(dispatch! state-atom :user-choose-country %))
     (m/Center :child (m/CircularProgressIndicator.))))
 
-(defn- widget-country-details [& {:keys [state snapshot]}]
-  (cond 
-    (= m.ConnectionState/waiting (.-connectionState snapshot))
-    (f/nest
-      (m/Padding. :padding (m.EdgeInsets/only :top 24))
-      (m/Center.)
-      (m/CircularProgressIndicator.))
-
-    (.-hasError snapshot)
-    (m/Center. :child (m/Text. "Unable to get the country"))
-
-    :else 
-    (m/Column.
+(defn- widget-country-details [{country :country}]
+  (m/Column.
       :crossAxisAlignment m.CrossAxisAlignment/start
       :children
       [^:const (m/SizedBox. :height 12)
        ^:const (m/Text. "Country Info"
-                        :style (m/TextStyle. :fontWeight m.FontWeight/bold))
+                        :style (m/TextStyle. :fontWeight m.FontWeight/bold
+                                             :fontSize 16))
        ^:const (m/SizedBox. :height 6)
-       (f/nest
-         (m/Card. :color (.shade50 m.Colors/grey)
-                  :elevation 2.0)
-         (let [keys [:name :capital :code :native :currency :phone :emoji]
-               texts (map #(-> % str (subs 1) capitalize (str ":")) keys)
-               descr-style ^:const (m/TextStyle. :fontWeight m.FontWeight/bold :fontSize 16)
-               name-style ^:const (m/TextStyle. :fontSize 16)
-               country (.-data snapshot)]
-           (m/Padding. 
-              :padding (m.EdgeInsets/symmetric :horizontal 16 :vertical 16)
-              :child 
-              (m/Row.
-                :children
-                [(m/Column. 
-                   :crossAxisAlignment m.CrossAxisAlignment/start
-                   :children ^:const (map #(m/Text. % :style name-style) texts))
-                 ^:const (m/Spacer. :flex 3)
-                 (m/Column.
-                   :crossAxisAlignment m.CrossAxisAlignment/start
-                   :children ^:const (map #(m/Text. (% country) :style descr-style) keys))
-                 ^:const (m/Spacer. :flex 3)])
-              )))
-       ^:const (m/SizedBox. :height 12)
-       (m/Text. "Countinent Info"
-                :style (m/TextStyle. :fontWeight m.FontWeight/bold))
-       ^:const (m/SizedBox. :height 12)
-       (m/Text. (-> snapshot .-data :continent :name))])))
+       (let [keys [:name :capital :code :native :currency :phone :emoji]
+             texts (map #(-> % str (subs 1) capitalize (str ":")) keys)
+             descr-style ^:const (m/TextStyle. :fontWeight m.FontWeight/bold :fontSize 16)
+             name-style ^:const (m/TextStyle. :fontSize 16)]
+         (nest
+           (m/Card. :color (.shade50 m.Colors/grey) :elevation 2.0)
+           (m/Padding. :padding (m.EdgeInsets/symmetric :horizontal 16 :vertical 16))
+           (m/Row.
+             :children
+             [(m/Column. 
+                :crossAxisAlignment m.CrossAxisAlignment/start
+                :children ^:const (map #(m/Text. % :style name-style) texts))
+              ^:const (m/Spacer. :flex 3)
+              (m/Column.
+                :crossAxisAlignment m.CrossAxisAlignment/start
+                :children ^:const (map #(m/Text. (% country) :style descr-style) keys))
+              ^:const (m/Spacer. :flex 3)])))]))
+
+(defn- widget-continent-details [state-atom]
+  (let [{:keys [expanded continent country]} @state-atom]
+   (m/Column.
+    :crossAxisAlignment m.CrossAxisAlignment/start
+    :children 
+    [^:const (m/SizedBox. :height 12)
+     (m/Text. "Continent Info"
+              :style (m/TextStyle. :fontWeight m.FontWeight/bold
+                                   :fontSize 16))
+     ^:const (m/SizedBox. :height 12)
+     (m/Text. (-> country :continent :name))
+     (m.TextButton/icon
+       :style (m.TextButton/styleFrom 
+                :backgroundColor m.Colors/white
+                :elevation 2
+                :padding ^:const (m.EdgeInsets/symmetric :horizontal 16))
+       :onPressed (fn [] 
+                    (log "about to dispatch in button")
+                    (dispatch! state-atom 
+                               :user-click-expand-continent 
+                               (-> @state-atom :country :continent :code)))
+       :label ^:const (m/Text. (if expanded "hide" "expand"))
+       :icon ^:const (m/Icon. 
+                       (if expanded  m.Icons/close m.Icons/expand_circle_down) 
+                       :size 24))
+     (cond 
+       (and expanded continent)
+       (m/Wrap.
+           :direction m.Axis/horizontal 
+           :spacing 8
+           :runSpacing 4
+           :children  (map
+                        (fn [{name :name code :code}]
+                          (m/FilterChip.
+                            :backgroundColor m.Colors/white
+                            :elevation 5
+                            :labelStyle 
+                            (m/TextStyle. :color m.Colors/grey :fontWeight m.FontWeight/bold)
+                            :label (m/Text. name :style (m/TextStyle. :fontSize 12))
+                            :onSelected (fn [value] nil)))
+                        (:countries continent)))
+
+       expanded
+       (m/Center :child (m/CircularProgressIndicator.))
+
+       :else 
+       ^:const (m/SizedBox. :height 16))])))
 
 (defn ^m/Widget first-page [_]
-  (f/widget
-    :state [state {:count 0 
-                   :selected (map->Country {:name "France" :code "FR"})}]
-    (m/Scaffold. 
-      :appBar (m/AppBar. :title (m/Text. "Country TEA app"))
-      :body 
-      (m/Container
-        :padding ^:const (m.EdgeInsets/all 16),
-        :child (m/Column.
-        :children 
-        [^:const (m/SizedBox. :height 16)
-         (m/FutureBuilder.
-           :future (api/get-countries)
-           :builder #(widget-pick-country :state state :snapshot %2))
-         (if-let [code (-> @state :selected :code)]
-           (m/FutureBuilder
-             :future (api/get-country code)
-             :builder #(widget-country-details :state state :snapshot %2))
-           (m/SizedBox. :height 0))])))))
+  (widget
+    :state [state-atom {:selected-country-code nil
+                        :country nil 
+                        :continent nil 
+                        :expanded nil}]
+    (do
+      (when (-> @state-atom :selected-country-code nil?) 
+        (dispatch! state-atom :user-choose-country "FR"))
+      (when (-> @state-atom :countries nil?) 
+        (dispatch! state-atom :user-openes-app nil))
+      (m/Scaffold. 
+        :appBar (m/AppBar. :title (m/Text. "Country TEA app"))
+        :body 
+        (m/SingleChildScrollView.
+          :scrollDirection m.Axis/vertical
+          :child
+          (m/Container
+            :padding ^:const (m.EdgeInsets/all 16),
+            :child 
+            (m/Column.
+              :crossAxisAlignment m.CrossAxisAlignment/start
+              :children 
+              (filter
+                some?
+                [^:const (m/SizedBox. :height 16)
+                 (widget-pick-country state-atom)
+                 (when (:country @state-atom)
+                   (widget-country-details @state-atom))
+                 (when (:country @state-atom)
+                   (widget-continent-details state-atom))]))))))))
 
 (defn main []
   (m/runApp
