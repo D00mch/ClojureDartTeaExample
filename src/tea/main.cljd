@@ -21,7 +21,6 @@
     :user-openes-app [state [#(effect-load-countries %)]]
 
     :user-choose-country [(assoc state :selected-country-code data :continent nil :expanded nil) 
-                          ;; some side effects demonstration : TODO rm in favor of readme
                           [#(effect-load-country % data)
                            #(log "country selected")]]
 
@@ -29,8 +28,6 @@
                                     (assoc state :expanded false)
                                     (assoc state :expanded true))
                                   (if (:continent state) [] [#(effect-load-continent % data)])]
-
-    ;; effects are optional: TODO: put in readme
 
     :loaded-countries [(assoc state :countries data)]
 
