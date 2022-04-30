@@ -16,17 +16,18 @@
 (defn- ^:async effect-load-continent [dispatch! code]
   (dispatch! :loaded-continent (await (api/get-continent code))))
 
+(defn- ^:async effect-select-default-country [dispatch!]
+  (dispatch! :user-choose-country "FR"))
+
 (defn- tea-update [state message data]
   (case message
-    :user-openes-app [state [#(effect-load-countries %)]]
+    :user-openes-app [state [effect-load-countries effect-select-default-country]]
 
     :user-choose-country [(assoc state :selected-country-code data :continent nil :expanded nil) 
                           [#(effect-load-country % data)
                            #(log "country selected")]]
 
-    :user-click-expand-continent [(if (:expanded state)
-                                    (assoc state :expanded false)
-                                    (assoc state :expanded true))
+    :user-click-expand-continent [(assoc state :expanded (not (:expanded state)))
                                   (if (:continent state) [] [#(effect-load-continent % data)])]
 
     :loaded-countries [(assoc state :countries data)]
@@ -143,31 +144,28 @@
                         :country nil 
                         :continent nil 
                         :expanded nil}]
-    (do
-      (when (-> @state-atom :selected-country-code nil?) 
-        (dispatch! state-atom :user-choose-country "FR"))
-      (when (-> @state-atom :countries nil?) 
-        (dispatch! state-atom :user-openes-app nil))
-      (m/Scaffold. 
-        :appBar (m/AppBar. :title (m/Text. "Country TEA app"))
-        :body 
-        (m/SingleChildScrollView.
-          :scrollDirection m.Axis/vertical
-          :child
-          (m/Container
-            :padding ^:const (m.EdgeInsets/all 16),
-            :child 
-            (m/Column.
-              :crossAxisAlignment m.CrossAxisAlignment/start
-              :children 
-              (filter
-                some?
-                [^:const (m/SizedBox. :height 16)
-                 (widget-pick-country state-atom)
-                 (when (:country @state-atom)
-                   (widget-country-details @state-atom))
-                 (when (:country @state-atom)
-                   (widget-continent-details state-atom))]))))))))
+    :with [_ (dispatch! state-atom :user-openes-app nil) 
+           :dispose comment]
+    (m/Scaffold. 
+      :appBar (m/AppBar. :title (m/Text. "Country TEA app"))
+      :body 
+      (m/SingleChildScrollView.
+        :scrollDirection m.Axis/vertical
+        :child
+        (m/Container
+          :padding ^:const (m.EdgeInsets/all 16),
+          :child 
+          (m/Column.
+            :crossAxisAlignment m.CrossAxisAlignment/start
+            :children 
+            (filter
+              some?
+              [^:const (m/SizedBox. :height 16)
+               (widget-pick-country state-atom)
+               (when (:country @state-atom)
+                 (widget-country-details @state-atom))
+               (when (:country @state-atom)
+                 (widget-continent-details state-atom))])))))))
 
 (defn main []
   (m/runApp
