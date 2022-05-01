@@ -7,7 +7,7 @@ ClojureDart Flutter project with demonstration of:
 
 \* The Elm architecture
 
-![image](https://user-images.githubusercontent.com/14236531/166006415-0567543c-6ddf-4035-83b6-e7f5aec35bf2.png)
+<img src="https://user-images.githubusercontent.com/14236531/166006415-0567543c-6ddf-4035-83b6-e7f5aec35bf2.png" width="200">
 
 ## Warnings!
 
@@ -15,22 +15,71 @@ This approach is not ready for production, just the idea demo.
 
 ## MVU TEA-like architecture
 
-I will provide my vision to the TEA.
+You may read about TEA approaches in other libraries ([dart](https://github.com/p69/dartea), [kotlin](https://oolong-kt.org/)).
 
-There are 4 parts:
+Here I will provide my vision to the TEA.
+
+### There are 4 components:
 
 1. Model - application state.
 2. Effects - side effect functions. 
 3. Message - events that happens, like user click or effect result
 3. Update - function that takes old model and message, and return new model with list of effects.
 
-To allow all this to work we have a `dispatch` function, that takes messages from all the source.
+To allow all this to work we have a `dispatch` function, that takes messages from all the sources.
 
-So in this app this components are:
-1. Model. State of the flutter/widget.
-2. Effects. Functions with the signature like `(defn some-effect [dispatch-fn] ...)`
-3. Messages. Keywords.
-4. Update. Function with the signature like `(defn update [state message-key data])`. Data is a part of the message abstraction.
+## MVU Components example:
+
+1. Model - atom with map:
+```clojure
+{:selected-country-code nil
+ :country nil 
+ :continent nil 
+ :expanded nil}
+```
+
+2. Effects - functions with the signature like `(defn some-effect [dispatch-fn] ...)`:
+```clojure
+(defn- effect-load-countries [dispatch!]
+  (dispatch! :loaded-countries (await (api/get-countries))))
+
+;; effect with additional arg (code)
+(defn- effect-load-continent [dispatch! code]
+  (dispatch! :loaded-continent (await (api/get-continent code))))
+
+;; effect as a lambda that ignores args 
+#(log "country selected")
+```
+
+3. Messages - Keywords:
+```clojure
+:user-openes-app
+:loaded-continent
+:loaded-countries 
+...
+```
+
+4. Update - function that takes state-map, message and message-data and returns vector with new state and effects:
+```clojure
+(defn- tea-update [state message data]
+  (case message
+    :user-openes-app [state [effect-load-countries effect-select-default-country]]
+
+    ;; changing state and passing two lambda-effects
+    :user-choose-country [(assoc state :selected-country-code data :continent nil :expanded nil) 
+                          [#(effect-load-country % data)
+                           #(log "country selected")]]
+
+    ;; effects may vary based on condifions
+    :user-click-expand-continent [(assoc state :expanded (not (:expanded state)))
+                                  (if (:continent state) [] [#(effect-load-continent % data)])]
+
+    ;; effects could be omited
+    :loaded-countries [(assoc state :countries data)]
+
+    ;; default state
+    [state [#(log "don't know how to process the message")]]))
+```
 
 For all this to work you don't need a framework, just 1 dispatch function:
 ```clojure
