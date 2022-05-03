@@ -1,7 +1,4 @@
-{:hooks 
- {:analyze-call {cljd.flutter.alpha/widget hooks.tea/widget2}}
- :linters 
+{:linters 
  {:unresolved-symbol {:exclude [bool Function fallback List Map]}
   :unresolved-namespace {:exclude [dart dart:core]}
-  :clojure-lsp/unused-public-var {:exclude #{main}}
-  :flutter/widget {:level :error}}}
+  :clojure-lsp/unused-public-var {:exclude #{main}}}}
