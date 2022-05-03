@@ -10,7 +10,7 @@
 (def ^{:private true :const true} 
   base-url "https://countries.trevorblades.com/")
 
-(def ^:private http-link (g/HttpLink. base-url))
+(def ^:private http-link (g/HttpLink base-url))
 
 (def ^{:private true :conts true} query-get-countries 
 "query {
@@ -48,8 +48,8 @@
 
 
 (def ^:private client 
-  (g/GraphQLClient. :link http-link 
-                    :cache (g/GraphQLCache. :store (g/InMemoryStore.))))
+  (g/GraphQLClient :link http-link 
+                   :cache (g/GraphQLCache :store (g/InMemoryStore.))))
 
 (defn- keywordize-blunt [entry]
   (cond 
@@ -73,22 +73,22 @@
 (defn ^:async get-countries []
   (let [opts  (g/QueryOptions :document (g/gql query-get-countries))
         result (-> client (.query opts) await)]
-    (if (.-hasException result)
+    (if (.hasException result)
       {:error (.exception! result)}
-      (keywordize-keys (-> result .-data keywordize-blunt :countries)))))
+      (keywordize-keys (-> result .data keywordize-blunt :countries)))))
 
 (defn ^:async get-country [code]
-  (let [opts (g/QueryOptions. :document (g/gql query-get-country)
-                              :variables (. {"code" code} #/(cast String dynamic)))
+  (let [opts (g/QueryOptions :document (g/gql query-get-country)
+                             :variables (. {"code" code} #/(cast String dynamic)))
         result (-> client (.query opts) await)]
-    (if (.-hasException result)
+    (if (.hasException result)
       {:error (.exception! result)}
-      (keywordize-keys (-> result .-data keywordize-blunt :country)))))
+      (keywordize-keys (-> result .data keywordize-blunt :country)))))
 
 (defn ^:async get-continent [code]
-  (let [opts (g/QueryOptions. :document (g/gql query-get-continents)
-                              :variables (. {"code" code} #/(cast String dynamic)))
+  (let [opts (g/QueryOption :document (g/gql query-get-continents)
+                            :variables (. {"code" code} #/(cast String dynamic)))
         result (-> client (.query opts) await)]
-    (if (.-hasException result)
+    (if (.hasException result)
       {:error (.exception! result)}
-      (keywordize-keys (-> result .-data keywordize-blunt :continent)))))
+      (keywordize-keys (-> result .data keywordize-blunt :continent)))))

@@ -1,9 +1,9 @@
 (ns tea.main
   (:require
-   ["package:flutter/material.dart" :as m]
-   [clojure.string :refer [join capitalize]]
-   [tea.api :as api]
-   [cljd.flutter.alpha :refer [nest widget]]))
+    ["package:flutter/material.dart" :as m]
+    [clojure.string :refer [join capitalize]]
+    [tea.api :as api]
+    [cljd.flutter.alpha :refer [nest widget]]))
 
 (defn- log [& args] (dart:core/print (join " " (list* "main: " args))))
 
@@ -23,7 +23,10 @@
   (case message
     :user-openes-app [state [effect-load-countries effect-select-default-country]]
 
-    :user-choose-country [(assoc state :selected-country-code data :continent nil :expanded nil) 
+    :user-choose-country [(assoc state 
+                                 :selected-country-code data
+                                 :continent nil 
+                                 :expanded nil) 
                           [#(effect-load-country % data)
                            #(log "country selected")]]
 
@@ -47,96 +50,96 @@
 
 (defn- widget-pick-country [state-atom]
   (if-let [countries (-> @state-atom :countries)]
-    (m/DropdownButtonFormField.
+    (m/DropdownButtonFormField
       :decoration 
-      ^:const (m/InputDecoration.
+      ^:const (m/InputDecoration
                 :labelText "Choose Country"
-                :border (m/OutlineInputBorder.))
+                :border (m/OutlineInputBorder))
       :isExpanded true
       :items ^List (map 
                      (fn [country]
                        (m/DropdownMenuItem
-                         :child (m/Text. (:name country))
+                         :child (m/Text (:name country))
                          :value (:code country)))
                      countries)
       :value (-> @state-atom :selected-country-code)
       :onChanged #(dispatch! state-atom :user-choose-country %))
-    (m/Center :child (m/CircularProgressIndicator.))))
+    (m/Center :child (m/CircularProgressIndicator))))
 
 (defn- widget-country-details [{country :country}]
-  (m/Column.
-      :crossAxisAlignment m.CrossAxisAlignment/start
-      :children
-      [^:const (m/SizedBox. :height 12)
-       ^:const (m/Text. "Country Info"
-                        :style (m/TextStyle. :fontWeight m.FontWeight/bold
-                                             :fontSize 16))
-       ^:const (m/SizedBox. :height 6)
-       (let [keys [:name :capital :code :native :currency :phone :emoji]
-             texts (map #(-> % str (subs 1) capitalize (str ":")) keys)
-             descr-style ^:const (m/TextStyle. :fontWeight m.FontWeight/bold :fontSize 16)
-             name-style ^:const (m/TextStyle. :fontSize 16)]
-         (nest
-           (m/Card. :color (.shade50 m.Colors/grey) :elevation 2.0)
-           (m/Padding. :padding (m.EdgeInsets/symmetric :horizontal 16 :vertical 16))
-           (m/Row.
-             :children
-             [(m/Column. 
-                :crossAxisAlignment m.CrossAxisAlignment/start
-                :children ^:const (map #(m/Text. % :style name-style) texts))
-              ^:const (m/Spacer. :flex 3)
-              (m/Column.
-                :crossAxisAlignment m.CrossAxisAlignment/start
-                :children ^:const (map #(m/Text. (% country) :style descr-style) keys))
-              ^:const (m/Spacer. :flex 3)])))]))
+  (m/Column
+    :crossAxisAlignment m.CrossAxisAlignment/start
+    :children
+    [^:const (m/SizedBox :height 12)
+     ^:const (m/Text "Country Info"
+                     :style (m/TextStyle :fontWeight m.FontWeight/bold
+                                         :fontSize 16))
+     ^:const (m/SizedBox :height 6)
+     (let [keys [:name :capital :code :native :currency :phone :emoji]
+           texts (map #(-> % str (subs 1) capitalize (str ":")) keys)
+           descr-style ^:const (m/TextStyle :fontWeight m.FontWeight/bold :fontSize 16)
+           name-style ^:const (m/TextStyle :fontSize 16)]
+       (nest
+         (m/Card :color (.shade50 m.Colors/grey) :elevation 2.0)
+         (m/Padding :padding (m.EdgeInsets/symmetric :horizontal 16 :vertical 16))
+         (m/Row
+           :children
+           [(m/Column 
+              :crossAxisAlignment m.CrossAxisAlignment/start
+              :children ^:const (map #(m/Text % :style name-style) texts))
+            ^:const (m/Spacer :flex 3)
+            (m/Column
+              :crossAxisAlignment m.CrossAxisAlignment/start
+              :children ^:const (map #(m/Text (% country) :style descr-style) keys))
+            ^:const (m/Spacer :flex 3)])))]))
 
 (defn- widget-continent-details [state-atom]
   (let [{:keys [expanded continent country]} @state-atom]
-   (m/Column.
-    :crossAxisAlignment m.CrossAxisAlignment/start
-    :children 
-    [^:const (m/SizedBox. :height 12)
-     (m/Text. "Continent Info"
-              :style (m/TextStyle. :fontWeight m.FontWeight/bold
+    (m/Column
+      :crossAxisAlignment m.CrossAxisAlignment/start
+      :children 
+      [^:const (m/SizedBox :height 12)
+       (m/Text "Continent Info"
+               :style (m/TextStyle :fontWeight m.FontWeight/bold
                                    :fontSize 16))
-     ^:const (m/SizedBox. :height 12)
-     (m/Text. (-> country :continent :name))
-     (m.TextButton/icon
-       :style (m.TextButton/styleFrom 
-                :backgroundColor m.Colors/white
-                :elevation 2
-                :padding ^:const (m.EdgeInsets/symmetric :horizontal 16))
-       :onPressed (fn [] 
-                    (log "about to dispatch in button")
-                    (dispatch! state-atom 
-                               :user-click-expand-continent 
-                               (-> @state-atom :country :continent :code)))
-       :label ^:const (m/Text. (if expanded "hide" "expand"))
-       :icon ^:const (m/Icon. 
-                       (if expanded  m.Icons/close m.Icons/expand_circle_down) 
-                       :size 24))
-     (cond 
-       (and expanded continent)
-       (m/Wrap.
+       ^:const (m/SizedBox :height 12)
+       (m/Text (-> country :continent :name))
+       (m.TextButton/icon
+         :style (m.TextButton/styleFrom 
+                  :backgroundColor m.Colors/white
+                  :elevation 2
+                  :padding ^:const (m.EdgeInsets/symmetric :horizontal 16))
+         :onPressed (fn [] 
+                      (log "about to dispatch in button")
+                      (dispatch! state-atom 
+                                 :user-click-expand-continent 
+                                 (-> @state-atom :country :continent :code)))
+         :label ^:const (m/Text (if expanded "hide" "expand"))
+         :icon ^:const (m/Icon 
+                         (if expanded  m.Icons/close m.Icons/expand_circle_down) 
+                         :size 24))
+       (cond 
+         (and expanded continent)
+         (m/Wrap
            :direction m.Axis/horizontal 
            :spacing 8
            :runSpacing 4
            :children  (map
                         (fn [{name :name code :code}]
-                          (m/FilterChip.
+                          (m/FilterChip
                             :backgroundColor m.Colors/white
                             :elevation 5
                             :labelStyle 
-                            (m/TextStyle. :color m.Colors/grey :fontWeight m.FontWeight/bold)
-                            :label (m/Text. name :style (m/TextStyle. :fontSize 12))
+                            (m/TextStyle :color m.Colors/grey :fontWeight m.FontWeight/bold)
+                            :label (m/Text name :style (m/TextStyle :fontSize 12))
                             :onSelected (fn [value] nil)))
                         (:countries continent)))
 
-       expanded
-       (m/Center :child (m/CircularProgressIndicator.))
+         expanded
+         (m/Center :child (m/CircularProgressIndicator.))
 
-       :else 
-       ^:const (m/SizedBox. :height 16))])))
+         :else 
+         ^:const (m/SizedBox :height 16))])))
 
 (defn ^m/Widget first-page [_]
   (widget
@@ -146,8 +149,8 @@
                         :expanded nil}]
     :with [_ (dispatch! state-atom :user-openes-app nil) 
            :dispose comment]
-    (m/Scaffold. 
-      :appBar (m/AppBar. :title (m/Text. "Country TEA app"))
+    (m/Scaffold 
+      :appBar (m/AppBar :title (m/Text "Country TEA app"))
       :body 
       (m/SingleChildScrollView.
         :scrollDirection m.Axis/vertical
@@ -160,7 +163,7 @@
             :children 
             (filter
               some?
-              [^:const (m/SizedBox. :height 16)
+              [^:const (m/SizedBox :height 16)
                (widget-pick-country state-atom)
                (when (:country @state-atom)
                  (widget-country-details @state-atom))
@@ -171,6 +174,6 @@
   (m/runApp
     (m/MaterialApp.
       :title "Country App"
-      :theme (m/ThemeData. :primarySwatch m.Colors/pink)
+      :theme (m/ThemeData :primarySwatch m.Colors/pink)
       :initialRoute "/" 
       :routes {"/" first-page})))
